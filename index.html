@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SmartBin AI</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: url('background_image.jpg') no-repeat center center fixed;
+      background-size: cover;
+      color: #f5f5f5;
+      text-align: center;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+    h1 {
+      font-size: 2.5em;
+      font-weight: bold;
+      text-shadow: 2px 2px 6px rgba(0,0,0,0.7);
+    }
+    p {
+      font-size: 1.2em;
+      text-shadow: 1px 1px 4px rgba(0,0,0,0.7);
+    }
+    .glass-box {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 15px;
+      padding: 20px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+      max-width: 90%;
+    }
+    #preview {
+      max-width: 100%;
+      margin-top: 1em;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+    .result {
+      margin-top: 1em;
+    }
+    button {
+      background: linear-gradient(135deg, #4CAF50, #2e7d32);
+      color: white;
+      padding: 0.8em 1.5em;
+      font-size: 1em;
+      font-weight: bold;
+      border: none;
+      border-radius: 25px;
+      cursor: pointer;
+      margin-top: 1em;
+      transition: transform 0.2s ease, background 0.3s ease;
+    }
+    button:hover {
+      background: linear-gradient(135deg, #66bb6a, #388e3c);
+      transform: scale(1.05);
+    }
+    input[type="file"] {
+      margin-top: 1em;
+      color: #f5f5f5;
+    }
+  </style>
+</head>
+<body>
+  <div class="glass-box">
+    <h1>SmartBin AI</h1>
+    <p>Snap or select a photo of your waste item to see the right bin!</p>
+    <input type="file" accept="image/*" capture="environment" id="imageInput" />
+    <br />
+    <img id="preview" src="" alt="Preview" hidden />
+    <br />
+    <button onclick="classifyImage()">Classify Garbage</button>
+
+    <div class="result" id="result" hidden>
+      <h3>Result</h3>
+      <p><strong>Category:</strong> <span id="category"></span></p>
+      <p><strong>Tip:</strong> <span id="tip"></span></p>
+    </div>
+  </div>
+
+  <script>
+    const imageInput = document.getElementById("imageInput");
+    const preview = document.getElementById("preview");
+    let selectedFile = null;
+
+    imageInput.addEventListener("change", (event) => {
+      selectedFile = event.target.files[0];
+      if (selectedFile) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          preview.src = e.target.result;
+          preview.hidden = false;
+        };
+        reader.readAsDataURL(selectedFile);
+      }
+    });
+
+    async function classifyImage() {
+      if (!selectedFile) {
+        alert("Please select an image first.");
+        return;
+      }
+
+      const resizedBlob = await resizeImage(selectedFile, 300, 300);
+
+      const formData = new FormData();
+      formData.append("image", resizedBlob, "resized.jpg");
+
+      try {
+        const response = await fetch("http://127.0.0.1:5000/classify_garbage", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) throw new Error("Failed to classify image.");
+
+        const data = await response.json();
+        document.getElementById("category").textContent = data.category;
+        document.getElementById("tip").textContent = data.tip;
+        document.getElementById("result").hidden = false;
+      } catch (error) {
+        alert("Error: " + error.message);
+      }
+    }
+
+    function resizeImage(file, width, height) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        const canvas = document.createElement("canvas");
+        const reader = new FileReader();
+
+        reader.onload = () => {
+          img.onload = () => {
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, width, height);
+            canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.9);
+          };
+          img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  </script>
+</body>
+</html>
